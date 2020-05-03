@@ -1,0 +1,6 @@
+group 'com.weirdgeeks'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
