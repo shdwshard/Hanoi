@@ -4,6 +4,9 @@ import com.jme3.app.FlyCamAppState;
 import com.jme3.app.SimpleApplication;
 import com.jme3.collision.CollisionResult;
 import com.jme3.collision.CollisionResults;
+import com.jme3.effect.ParticleEmitter;
+import com.jme3.effect.ParticleMesh;
+import com.jme3.effect.shapes.EmitterMeshFaceShape;
 import com.jme3.input.MouseInput;
 import com.jme3.input.controls.ActionListener;
 import com.jme3.input.controls.InputListener;
@@ -12,7 +15,10 @@ import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
 import com.jme3.material.Material;
 import com.jme3.math.*;
+import com.jme3.post.FilterPostProcessor;
+import com.jme3.post.filters.BloomFilter;
 import com.jme3.scene.Geometry;
+import com.jme3.scene.Mesh;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
@@ -20,14 +26,12 @@ import com.jme3.scene.shape.Sphere;
 import com.jme3.system.AppSettings;
 import com.weirdgeeks.model.Disc;
 import com.weirdgeeks.model.Peg;
+import com.weirdgeeks.model.Rules;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -37,7 +41,11 @@ public class Application extends SimpleApplication {
     Logger log = LoggerFactory.getLogger(SimpleApplication.class);
     List<Peg> pegs = new ArrayList<>();
     List<Disc> discs = new ArrayList<>();
-    private Geometry mark;
+    Peg selectedPeg;
+    Pattern discPattern = Pattern.compile("^Disc(\\d+)$");
+    Pattern pegPattern = Pattern.compile("^Peg(\\d+)$");
+    Rules rules = new Rules();
+    ParticleEmitter emitter;
 
     private InputListener actionListener = (ActionListener) (name, isPressed, tpf) -> {
             if (name.equals("Pick") && !isPressed) {
@@ -55,34 +63,69 @@ public class Application extends SimpleApplication {
                     float dist = results.getCollision(i).getDistance();
                     Vector3f pt = results.getCollision(i).getContactPoint();
                     String hit = results.getCollision(i).getGeometry().getName();
-                    System.out.println("* Collision #" + i);
-                    System.out.println("  You shot " + hit + " at " + pt + ", " + dist + " wu away.");
+                    log.info("* Collision #" + i);
+                    log.info("  You shot {} at {}, {} wu away.",hit,pt,dist);
                 }
                 // 5. Use the results (we mark the hit object)
                 if (results.size() > 0) {
                     // The closest collision point is what was truly hit:
                     CollisionResult closest = results.getClosestCollision();
-                    // Let's interact - we mark the hit with a red dot.
-                    mark.setLocalTranslation(closest.getContactPoint());
-                    rootNode.attachChild(mark);
-                } else {
-                    // No hits? Then remove the red mark.
-                    rootNode.detachChild(mark);
+                    log.info("Closest hit: {}",closest.getGeometry().getName());
+                    Matcher pegMatcher = pegPattern.matcher(closest.getGeometry().getName());
+                    Matcher discMatcher = discPattern.matcher(closest.getGeometry().getName());
+                    Peg tappedPeg = null;
+                    if (discMatcher.matches()) {
+                        tappedPeg = discs.get(Integer.parseInt(discMatcher.group(1)) - 1).getLocation();
+                    } else if (pegMatcher.matches()) {
+                        tappedPeg = pegs.get(Integer.parseInt(pegMatcher.group(1)) -1);
+                    }
+
+                    if (tappedPeg != null) {
+                        // Drop target
+                        if (selectedPeg != null) {
+                            // Undo peg selection
+                            if (selectedPeg == tappedPeg) {
+                                selectedPeg = null;
+                                log.info("De-selected peg {}", tappedPeg.getNumber());
+                            } else {
+                                Disc topDisc = selectedPeg.getDiscs().get(selectedPeg.getDiscs().size() -1);
+                                if (rules.canPlace(topDisc, tappedPeg)) {
+                                    selectedPeg.getDiscs().remove(topDisc);
+                                    tappedPeg.getDiscs().add(topDisc);
+                                    topDisc.setLocation(tappedPeg);
+                                    selectedPeg = null;
+                                    rules.doMove();
+                                    log.info("Moved disc {} to peg {}", topDisc.getSize(), tappedPeg.getNumber());
+                                }
+                            }
+                        } else if (tappedPeg.getDiscs().size() > 0) {
+                            selectedPeg = tappedPeg;
+                            log.info("Selected peg {}",selectedPeg.getNumber());
+                        }
+                    }
                 }
             }
     };
+
+    public Application() {
+        super(new GameStats());
+    }
 
     public static void main(String[] args) {
 
         Application app = new Application();
 
         AppSettings settings = new AppSettings(true);
-        settings.setTitle("My Awesome Game");
+        settings.setTitle("Towers of Hanoi");
+        settings.setVSync(true);
+        settings.setResolution(800,600);
         app.setSettings(settings);
-
+        app.setShowSettings(false);
         app.start();
 
     }
+
+
 
     @Override
     public void simpleInitApp() {
@@ -102,6 +145,8 @@ public class Application extends SimpleApplication {
         pegs.sort(Comparator.comparingInt(Peg::getNumber));
 
         discs.forEach(disc -> disc.setLocation(pegs.get(0)));
+        pegs.get(0).getDiscs().addAll(discs);
+        pegs.get(0).getDiscs().sort(Comparator.comparingInt(Disc::getSize).reversed());
 
         Arrays.asList(
                 new AmbientLight(new ColorRGBA(0.2f,0.2f,0.2f,1f)),
@@ -115,19 +160,21 @@ public class Application extends SimpleApplication {
 
         inputManager.addMapping("Pick",new MouseButtonTrigger(MouseInput.BUTTON_LEFT));
         inputManager.addListener(actionListener, "Pick");
-        initMark();
+
+        glowMaterial = new Material(getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
+        glowMaterial.setColor("Color", ColorRGBA.DarkGray);
+        glowMaterial.setColor("GlowColor", ColorRGBA.White);
+        glowProcessor=new FilterPostProcessor(assetManager);
+        BloomFilter bloom= new BloomFilter(BloomFilter.GlowMode.Objects);
+        glowProcessor.addFilter(bloom);
+        bloom.setBlurScale(1f);
+        stateManager.getState(GameStats.class).setRules(rules);
     }
 
-    Pattern discPattern = Pattern.compile("^Disc(\\d+)$");
-    Pattern pegPattern = Pattern.compile("^Peg(\\d+)$");
-    /** A red ball that marks the last spot that was "hit" by the "shot". */
-    protected void initMark() {
-        Sphere sphere = new Sphere(30, 30, 0.2f);
-        mark = new Geometry("BOOM!", sphere);
-        Material mark_mat = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
-        mark_mat.setColor("Color", ColorRGBA.Red);
-        mark.setMaterial(mark_mat);
-    }
+    FilterPostProcessor glowProcessor;
+    Material glowMaterial;
+    Material prevMaterial;
+
     private void doMarkup(Spatial spatial) {
         Matcher discMatcher = discPattern.matcher(spatial.getName());
         Matcher pegMatcher = pegPattern.matcher(spatial.getName());
@@ -142,12 +189,34 @@ public class Application extends SimpleApplication {
         }
     }
 
-    float color = 0;
+
+    float discHeight = 0.2f;
+
     @Override
     public void simpleUpdate(float tpf) {
-        //TODO: add update code
-//        rootNode.getChildren().stream().filter(node -> node.getUserData("Disc") != null)
-//                .peek(node -> node.getUserData("Disc"))
-
+        // Step1: Update disc locations
+        discs.forEach(disc -> {
+            Vector3f peg = disc.getLocation().getSpatial().getLocalTranslation();
+            int discNum = disc.getLocation().getDiscs().indexOf(disc);
+            disc.getSpatial().setLocalTranslation(peg.x,discHeight * discNum + discHeight, peg.z);
+        });
+        // Step2: Selection target
+        if (selectedPeg == null) {
+            if (viewPort.getProcessors().contains(glowProcessor)) {
+                discs.forEach(disc -> {;
+                    if (((Geometry)disc.getSpatial()).getMaterial() == glowMaterial) {
+                        disc.getSpatial().setMaterial(prevMaterial);
+                    }
+                });
+                viewPort.removeProcessor(glowProcessor);
+            }
+        } else {
+            if (!viewPort.getProcessors().contains(glowProcessor)) {
+                Disc disc = selectedPeg.getDiscs().get(selectedPeg.getDiscs().size() -1);
+                viewPort.addProcessor(glowProcessor);
+                prevMaterial = ((Geometry)disc.getSpatial()).getMaterial();
+                disc.getSpatial().setMaterial(glowMaterial);
+            }
+        }
     }
 }

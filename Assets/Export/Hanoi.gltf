@@ -24,7 +24,7 @@
     "nodes" : [
         {
             "mesh" : 0,
-            "name" : "Disc1",
+            "name" : "Disc4",
             "translation" : [
                 0,
                 0.20000001788139343,
@@ -92,7 +92,7 @@
         },
         {
             "mesh" : 5,
-            "name" : "Disc2",
+            "name" : "Disc3",
             "translation" : [
                 0,
                 0.3999997675418854,
@@ -101,7 +101,7 @@
         },
         {
             "mesh" : 6,
-            "name" : "Disc3",
+            "name" : "Disc2",
             "translation" : [
                 0,
                 0.5999999642372131,
@@ -110,7 +110,7 @@
         },
         {
             "mesh" : 7,
-            "name" : "Disc4",
+            "name" : "Disc1",
             "translation" : [
                 0,
                 0.8000000715255737,
@@ -215,7 +215,7 @@
     ],
     "meshes" : [
         {
-            "name" : "Disc1",
+            "name" : "Disc4",
             "primitives" : [
                 {
                     "attributes" : {
@@ -290,7 +290,7 @@
             ]
         },
         {
-            "name" : "Disc2",
+            "name" : "Disc3",
             "primitives" : [
                 {
                     "attributes" : {
@@ -303,7 +303,7 @@
             ]
         },
         {
-            "name" : "Disc3",
+            "name" : "Disc2",
             "primitives" : [
                 {
                     "attributes" : {
@@ -316,7 +316,7 @@
             ]
         },
         {
-            "name" : "Disc4",
+            "name" : "Disc1",
             "primitives" : [
                 {
                     "attributes" : {

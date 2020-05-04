@@ -23,7 +23,7 @@ sourceSets {
         }
     }
 }
-
+def jme3 = [v:'3.2.4-stable', g:'org.jmonkeyengine']
 dependencies {
     // Testing
     testCompile group: 'junit', name: 'junit', version: '4.12'
@@ -33,8 +33,9 @@ dependencies {
     implementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.30'
 
     // 3d core libraries
-    implementation "org.jmonkeyengine:jme3-core:3.2.3-stable"
-    implementation "org.jmonkeyengine:jme3-plugins:3.2.3-stable"
-    implementation "org.jmonkeyengine:jme3-desktop:3.2.3-stable"
-    implementation "org.jmonkeyengine:jme3-lwjgl:3.2.3-stable"
+    implementation "${jme3.g}:jme3-core:${jme3.v}"
+    implementation "${jme3.g}:jme3-plugins:${jme3.v}"
+    implementation "${jme3.g}:jme3-effects:${jme3.v}"
+    implementation "${jme3.g}:jme3-desktop:${jme3.v}"
+    implementation "${jme3.g}:jme3-lwjgl:${jme3.v}"
 }
