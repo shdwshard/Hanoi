@@ -67,20 +67,20 @@ public class Application extends SimpleApplication {
                         click2d, 1f).subtractLocal(click3d).normalizeLocal();
                 Ray ray = new Ray(click3d, dir);
                 Stream.concat(pegs.stream().map(Peg::getSpatial),discs.stream().map(Disc::getSpatial)).forEach(node -> node.collideWith(ray,results));
-                System.out.println("----- Collisions? " + results.size() + "-----");
+                log.debug("----- Collisions? " + results.size() + "-----");
                 for (int i = 0; i < results.size(); i++) {
                     // For each hit, we know distance, impact point, name of geometry.
                     float dist = results.getCollision(i).getDistance();
                     Vector3f pt = results.getCollision(i).getContactPoint();
                     String hit = results.getCollision(i).getGeometry().getName();
-                    log.info("* Collision #" + i);
-                    log.info("  You shot {} at {}, {} wu away.",hit,pt,dist);
+                    log.debug("* Collision #" + i);
+                    log.debug("  You shot {} at {}, {} wu away.",hit,pt,dist);
                 }
                 // 5. Use the results (we mark the hit object)
                 if (results.size() > 0) {
                     // The closest collision point is what was truly hit:
                     CollisionResult closest = results.getClosestCollision();
-                    log.info("Closest hit: {}",closest.getGeometry().getName());
+                    log.trace("Closest hit: {}",closest.getGeometry().getName());
                     Matcher pegMatcher = pegPattern.matcher(closest.getGeometry().getName());
                     Matcher discMatcher = discPattern.matcher(closest.getGeometry().getName());
                     Peg tappedPeg = null;
@@ -96,7 +96,7 @@ public class Application extends SimpleApplication {
                             // Undo peg selection
                             if (selectedPeg == tappedPeg) {
                                 selectedPeg = null;
-                                log.info("De-selected peg {}", tappedPeg.getNumber());
+                                log.trace("De-selected peg {}", tappedPeg.getNumber());
                             } else {
                                 Disc topDisc = selectedPeg.getDiscs().get(selectedPeg.getDiscs().size() -1);
                                 if (rules.canPlace(topDisc, tappedPeg)) {
@@ -105,12 +105,12 @@ public class Application extends SimpleApplication {
                                     topDisc.setLocation(tappedPeg);
                                     selectedPeg = null;
                                     rules.doMove();
-                                    log.info("Moved disc {} to peg {}", topDisc.getSize(), tappedPeg.getNumber());
+                                    log.trace("Moved disc {} to peg {}", topDisc.getSize(), tappedPeg.getNumber());
                                 }
                             }
                         } else if (tappedPeg.getDiscs().size() > 0) {
                             selectedPeg = tappedPeg;
-                            log.info("Selected peg {}",selectedPeg.getNumber());
+                            log.trace("Selected peg {}",selectedPeg.getNumber());
                         }
                     }
                 }
@@ -144,7 +144,6 @@ public class Application extends SimpleApplication {
         Spatial hanoi = assetManager.loadModel("Hanoi.gltf");
 
         log.info(((Node)hanoi).getChildren().stream().map(node -> node.getName() + "(" + node.getLocalTranslation() + ")").collect(Collectors.joining(", ")));
-
 
         hanoi.rotate(0,-90,0);
         ((Node)hanoi).getChildren().stream()
