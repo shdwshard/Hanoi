@@ -13,16 +13,23 @@ import com.jme3.input.controls.InputListener;
 import com.jme3.input.controls.MouseButtonTrigger;
 import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
+import com.jme3.light.Light;
 import com.jme3.material.Material;
 import com.jme3.math.*;
+import com.jme3.post.Filter;
 import com.jme3.post.FilterPostProcessor;
 import com.jme3.post.filters.BloomFilter;
+import com.jme3.post.filters.FXAAFilter;
+import com.jme3.post.ssao.SSAOFilter;
+import com.jme3.renderer.queue.RenderQueue;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Mesh;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Sphere;
+import com.jme3.shadow.DirectionalLightShadowFilter;
+import com.jme3.shadow.DirectionalLightShadowRenderer;
 import com.jme3.system.AppSettings;
 import com.weirdgeeks.model.Disc;
 import com.weirdgeeks.model.Peg;
@@ -31,10 +38,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
+import java.awt.*;
 import java.util.*;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 public class Application extends SimpleApplication {
@@ -148,15 +158,35 @@ public class Application extends SimpleApplication {
         pegs.get(0).getDiscs().addAll(discs);
         pegs.get(0).getDiscs().sort(Comparator.comparingInt(Disc::getSize).reversed());
 
-        Arrays.asList(
-                new AmbientLight(new ColorRGBA(0.2f,0.2f,0.2f,1f)),
+        // Lights
+        List<Light> lights = Arrays.asList(
+                new AmbientLight(new ColorRGBA(0.2f,0.8f,0.8f,1f)),
                 new DirectionalLight(new Vector3f(-1f,-1f,1f).normalize(),new ColorRGBA(0.8f,0.8f,0.8f,1f)),
                 new DirectionalLight(new Vector3f(-1f,-1f,-1f).normalize(),new ColorRGBA(0.4f,0.4f,0.4f,1f))
-        ).forEach(rootNode::addLight);
+        );
+        lights.forEach(rootNode::addLight);
 
+        // Shadows
+        final int SHADOWMAP_SIZE=1024;
+        rootNode.setShadowMode(RenderQueue.ShadowMode.CastAndReceive);
+        lights.stream().filter(light -> light instanceof DirectionalLight).forEach(light -> {
+            DirectionalLightShadowRenderer dlsr = new DirectionalLightShadowRenderer(assetManager, SHADOWMAP_SIZE, 3);
+            dlsr.setShadowIntensity((float)Math.sqrt(light.getColor().toVector3f().lengthSquared()/3)/2);
+            dlsr.setLight((DirectionalLight)light);
+            viewPort.addProcessor(dlsr);
+        });
+
+        FilterPostProcessor fpp = new FilterPostProcessor(assetManager);
+        SSAOFilter ssaoFilter = new SSAOFilter(12.94f, 43.92f, 0.33f, 0.61f);
+        fpp.addFilter(ssaoFilter);
+        viewPort.addProcessor(fpp);
+
+        // Camera setup
         stateManager.detach( stateManager.getState(FlyCamAppState.class) );
+
         cam.setLocation(new Vector3f(5.6796985f, 3.3253722f, 0f));
         cam.setRotation(new Quaternion(0.15558477f, -0.68930024f, 0.15535718f, 0.69030625f));
+
 
         inputManager.addMapping("Pick",new MouseButtonTrigger(MouseInput.BUTTON_LEFT));
         inputManager.addListener(actionListener, "Pick");
@@ -187,6 +217,7 @@ public class Application extends SimpleApplication {
             Peg peg = new Peg(pegNumber, spatial);
             pegs.add(peg);
         }
+        spatial.setShadowMode(RenderQueue.ShadowMode.Inherit);
     }
 
 
